@@ -2,10 +2,8 @@
 
 from __future__ import annotations
 
-import difflib
 import json
-import textwrap
-from pathlib import Path
+from dataclasses import dataclass
 
 from .journal import Journal
 
@@ -90,7 +88,8 @@ class RollbackGenerator:
     def _undo_op(self, op: dict) -> list[str]:
         """Generate undo commands for a single operation."""
         op_type = op["op_type"]
-        lines = [f"# [{op_type}] {op.get('command') or op.get('path') or op.get('checkpoint_label', '')}"]
+        detail = op.get("command") or op.get("path") or op.get("checkpoint_label", "")
+        lines = [f"# [{op_type}] {detail}"]
 
         if op_type == "file-write" and op.get("content_before") is not None:
             path = op["path"]
@@ -99,8 +98,8 @@ class RollbackGenerator:
             before = op["content_before"].replace("'", "'\\''")
             lines.append(f"  cat > '{path}' << 'AGENT_UNDO_EOF'")
             lines.append(f"{(before)}")
-            lines.append(f"AGENT_UNDO_EOF")
-            lines.append(f"fi")
+            lines.append("AGENT_UNDO_EOF")
+            lines.append("fi")
 
         elif op_type == "shell" and op.get("command"):
             # Shell commands can't be auto-undone, but we note them
@@ -117,7 +116,7 @@ class RollbackGenerator:
                 lines.append(f"git reset --soft HEAD~1  # Undo: {cmd}")
             elif cmd.startswith("git push"):
                 lines.append(f"# WARNING: Remote push cannot be auto-undone: {cmd}")
-                lines.append(f"# Consider: git push --force-with-lease origin <previous-ref>")
+                lines.append("# Consider: git push --force-with-lease origin <previous-ref>")
             elif cmd.startswith("git branch -D"):
                 lines.append(f"# Deleted branch cannot be recovered from journal alone: {cmd}")
             else:
@@ -160,9 +159,6 @@ def preview_rollback(
             f"  [{op['op_type']}] {op.get('command') or op.get('path') or label or '(no details)'}"
         )
     return "\n".join(lines)
-
-
-from dataclasses import dataclass
 
 
 @dataclass
@@ -249,7 +245,8 @@ def format_simulation(plan: RollbackPlan) -> str:
     if other_ops:
         lines.append(f"Other operations ({len(other_ops)}):")
         for op in other_ops:
-            lines.append(f"  - [{op.op_type}] {op.label or op.path or op.command or '(no details)'}")
+            detail = op.label or op.path or op.command or "(no details)"
+            lines.append(f"  - [{op.op_type}] {detail}")
         lines.append("")
 
     if checkpoint_ops:
@@ -279,13 +276,16 @@ def format_simulation(plan: RollbackPlan) -> str:
     # Summary stats
     files_affected = len([op for op in plan.operations if op.path])
     commands_count = len(shell_ops) + len([op for op in git_ops if _git_undo_command(op)])
+    auto_undo_shell = len([op for op in shell_ops if _extract_undo_command(op)])
     lines.append("=== Summary ===")
     lines.append(f"Total operations: {len(plan.operations)}")
     lines.append(f"Files affected: {files_affected}")
     lines.append(f"Commands to execute: {commands_count}")
-    lines.append(f"Manual review needed: {len(shell_ops) - len([op for op in shell_ops if _extract_undo_command(op)])}")
+    lines.append(f"Manual review needed: {len(shell_ops) - auto_undo_shell}")
     lines.append("")
-    lines.append("NOTE: This is a simulation. No files, git repos, or the journal have been modified.")
+    lines.append(
+        "NOTE: This is a simulation. No files, git repos, or the journal have been modified."
+    )
 
     return "\n".join(lines)
 

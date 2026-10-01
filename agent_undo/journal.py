@@ -95,7 +95,8 @@ class Journal:
             if op_id is None:
                 # Create a checkpoint-type operation
                 cur = conn.execute(
-                    "INSERT INTO operations (session_id, op_type, timestamp, command) VALUES (?, 'checkpoint', ?, ?)",
+                    "INSERT INTO operations (session_id, op_type, timestamp, command)"
+                    " VALUES (?, 'checkpoint', ?, ?)",
                     (session_id, ts, label),
                 )
                 op_id = cur.lastrowid
@@ -110,7 +111,8 @@ class Journal:
         with self.transaction() as conn:
             if op_type:
                 rows = conn.execute(
-                    "SELECT * FROM operations WHERE session_id = ? AND op_type = ? ORDER BY timestamp",
+                    "SELECT * FROM operations"
+                    " WHERE session_id = ? AND op_type = ? ORDER BY timestamp",
                     (session_id, op_type),
                 ).fetchall()
             else:
