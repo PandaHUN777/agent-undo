@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import pytest
 
+from agent_undo.journal import Journal
 from agent_undo.rollback import (
     RollbackGenerator,
     RollbackOperation,
@@ -11,7 +12,6 @@ from agent_undo.rollback import (
     format_simulation,
     simulate_rollback,
 )
-from agent_undo.journal import Journal
 
 
 @pytest.fixture
@@ -75,7 +75,7 @@ class TestGeneratePlan:
 
     def test_plan_empty_when_no_ops_since(self, journal, generator):
         session_id = "test-sess"
-        cp_id = journal.checkpoint(session_id, "cp1")
+        journal.checkpoint(session_id, "cp1")
 
         plan = generator.generate_plan(session_id, checkpoint_label="cp1")
         assert len(plan.operations) == 0
@@ -95,7 +95,7 @@ class TestFormatSimulation:
 
     def test_file_write_restoring(self, generator, journal):
         session_id = "test-sess"
-        cp_id = journal.checkpoint(session_id, "cp1")
+        journal.checkpoint(session_id, "cp1")
         # Insert ops AFTER the checkpoint
         journal.record(session_id, "file-write", path="/tmp/config.py",
                        content_before="DEBUG = False\n")
@@ -111,7 +111,7 @@ class TestFormatSimulation:
 
     def test_shell_command_included(self, generator, journal):
         session_id = "test-sess"
-        cp_id = journal.checkpoint(session_id, "cp1")
+        journal.checkpoint(session_id, "cp1")
         # Insert ops AFTER the checkpoint
         journal.record(session_id, "shell", command="echo hello")
         journal.record(session_id, "shell", command="rm -rf /tmp/x")
@@ -125,7 +125,7 @@ class TestFormatSimulation:
 
     def test_git_commit_undo(self, generator, journal):
         session_id = "test-sess"
-        cp_id = journal.checkpoint(session_id, "cp1")
+        journal.checkpoint(session_id, "cp1")
         # Insert ops AFTER the checkpoint
         journal.record(session_id, "git", command="git commit -m 'feat: add stuff'")
         journal.record(session_id, "git", command="git push origin main")
@@ -138,7 +138,7 @@ class TestFormatSimulation:
 
     def test_simulation_contains_footer(self, generator, journal):
         session_id = "test-sess"
-        cp_id = journal.checkpoint(session_id, "cp1")
+        journal.checkpoint(session_id, "cp1")
         # Insert ops AFTER the checkpoint
         journal.record(session_id, "file-write", path="/tmp/x", content_before="data")
         journal.record(session_id, "shell", command="echo test")
@@ -152,7 +152,7 @@ class TestFormatSimulation:
     def test_deterministic_output(self, generator, journal):
         session_id = "test-sess"
         journal.record(session_id, "file-write", path="/tmp/a", content_before="line1\nline2")
-        cp_id = journal.checkpoint(session_id, "cp1")
+        journal.checkpoint(session_id, "cp1")
 
         output1 = simulate_rollback(generator, session_id, checkpoint_label="cp1")
         output2 = simulate_rollback(generator, session_id, checkpoint_label="cp1")
